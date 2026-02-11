@@ -17,6 +17,15 @@ def custom_SLIC(image_file, K, m):
     b = lab_image[:,:,2] - 128.0
 
     centers = init_cluster_centers(L, a, b, S)
+    # Number of recommended iterations is 10
+    for _ in range(2):
+        labels = assign_to_clusters(L, a, b, centers, S, m)
+        centers = update_cluster_centers(L, a, b, labels, centers)
+
+    labels = assign_to_clusters(L, a, b, centers, S, m)
+    #labels = enforce_connectivity(labels)
+
+    print(labels[:3*S, :3*S])  # Debug
 
 
 def distance(coord_1, coord_2, L1, a1, b1, L2, a2, b2, S, m):
@@ -35,7 +44,6 @@ def assign_to_clusters(L, a, b, centers, S, m):
                 ni, nj = i + di, j + dj
                 if 0 <= ni < h and 0 <= nj < w:
                     d = distance((i, j), (ni, nj), L[ni, nj], a[ni, nj], b[ni, nj], centers[idx][0], centers[idx][1], centers[idx][2], S, m)
-                    # Assignment based on distance
                     if d < distances[ni, nj]:
                         distances[ni, nj] = d
                         labels[ni, nj] = idx
@@ -85,6 +93,47 @@ def init_cluster_centers(L, a, b, S):
                         min_grad = grad_norm[ni, nj]
 
     return center
+
+def enforce_connectivity(labels):
+    cluster_sizes = np.bincount(labels.flatten())
+    for i in range(len(cluster_sizes)):
+        mask = (labels == i)
+        num_disjoint , disjoint_labels = cv.connectedComponents(mask.astype(np.uint8))
+        if num_disjoint > 2:
+            for j in range(1, num_disjoint):
+                if np.sum(disjoint_labels == j) < cluster_sizes[i] / 4:
+                    labels[disjoint_labels == j] = -1
+
+    stray_pixels = (labels == -1)
+    num_stray, stray_labels = cv.connectedComponents(stray_pixels.astype(np.uint8))
+    for i in range(1, num_stray):
+        mask = (stray_labels == i)
+        max_label = largest_neighbour(mask, labels)
+        labels[mask] = max_label
+
+    return labels
+
+def largest_neighbour(mask, labels):
+    label_list = np.unique(labels[labels != -1])
+    label_sizes = {label: np.sum(labels == label) for label in label_list}
+    max_size = 0
+    max_label = -1
+    for label in label_list:
+        if label in neighbour_labels(mask, labels):
+            if label_sizes[label] > max_size:
+                max_size = label_sizes[label]
+                max_label = label
+    return max_label
+
+def neighbour_labels(mask, labels):
+    label_list = np.unique(labels[labels != -1])
+    neighbours = set()
+    for label in label_list:
+        joint = np.ma.mask_or(mask, labels == label)
+        num_joint_cc, _ = cv.connectedComponents(joint.astype(np.uint8))
+        if num_joint_cc == 2:       # connectedComponentes returns the background as a component, so 2 means they are connected
+            neighbours.add(label)
+    return neighbours
 
 
 if __name__ == "__main__":
