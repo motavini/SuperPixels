@@ -2,7 +2,6 @@ import cv2 as cv
 import numpy as np
 
 def custom_SLIC(image_file, K, m):
-    # Read the image
     image = cv.imread(image_file)
 
     # Convert to LAB color space
@@ -12,6 +11,7 @@ def custom_SLIC(image_file, K, m):
     N = h*w
     S = int(np.sqrt(N / K))
 
+    # Normalize L, a, b channels
     L = lab_image[:,:,0] * 100.0 / 255.0
     a = lab_image[:,:,1] - 128.0
     b = lab_image[:,:,2] - 128.0
@@ -19,10 +19,44 @@ def custom_SLIC(image_file, K, m):
     centers = init_cluster_centers(L, a, b, S)
 
 
-def distance(L1, a1, b1, L2, a2, b2, S, m):
-    dc = np.sqrt((L1 - L2)**2 + (a1 - a2)**2 + (b1 - b2)**2)
-    ds = np.sqrt((L1 - L2)**2 + (a1 - a2)**2 + (b1 - b2)**2) / S
-    return np.sqrt(dc**2 + (m * ds)**2)
+def distance(coord_1, coord_2, L1, a1, b1, L2, a2, b2, S, m):
+    d_xy = np.sqrt((coord_1[0] - coord_2[0])**2 + (coord_1[1] - coord_2[1])**2)
+    d_lab = np.sqrt((L1 - L2)**2 + (a1 - a2)**2 + (b1 - b2)**2)
+    return d_lab + (m * d_xy / S)
+
+def assign_to_clusters(L, a, b, centers, S, m):
+    h, w = L.shape
+    distances = np.full((h, w), np.inf)
+    labels = np.full((h, w), -1, dtype=np.int32)
+
+    for idx, (_, _, _, i, j) in enumerate(centers):
+        for di in range(-S, S + 1):
+            for dj in range(-S, S + 1):
+                ni, nj = i + di, j + dj
+                if 0 <= ni < h and 0 <= nj < w:
+                    d = distance((i, j), (ni, nj), L[ni, nj], a[ni, nj], b[ni, nj], centers[idx][0], centers[idx][1], centers[idx][2], S, m)
+                    # Assignment based on distance
+                    if d < distances[ni, nj]:
+                        distances[ni, nj] = d
+                        labels[ni, nj] = idx
+    
+    return labels
+
+def update_cluster_centers(L, a, b, labels, centers):
+    new_centers = []
+    for idx in range(len(centers)):
+        mask = (labels == idx)
+        if np.any(mask):
+            L_mean = np.mean(L[mask])
+            a_mean = np.mean(a[mask])
+            b_mean = np.mean(b[mask])
+            i_mean = int(np.mean(np.where(mask)[0]))
+            j_mean = int(np.mean(np.where(mask)[1]))
+            new_centers.append((L_mean, a_mean, b_mean, i_mean, j_mean))
+        else:
+            new_centers.append(centers[idx])
+    return new_centers
+
 
 def gradient_magnitude(L, a, b):
     grad_L_x, grad_L_y = np.gradient(L)
