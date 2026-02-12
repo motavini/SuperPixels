@@ -31,12 +31,11 @@ def SLIC(image_file, K, m):
         a[mask] = centers[label][1]
         b[mask] = centers[label][2]
 
-    new_rgb_image = cv.cvtColor(np.dstack((L * 255.0 / 100.0, a + 128, b + 128)).astype(np.uint8), cv.COLOR_LAB2BGR)
-    cv.imshow("SLIC Superpixels", new_rgb_image)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    kernel = np.ones((3,3), np.uint8)
+    dilated = cv.dilate(labels.astype(np.uint8), kernel, iterations=1)
+    boundary_mask = (dilated != labels).astype(np.uint8) * 255
 
-    return labels, centers
+    return labels, boundary_mask
 
 
 def distance(coord_1, coord_2, L1, a1, b1, L2, a2, b2, S, m):
@@ -151,4 +150,10 @@ if __name__ == "__main__":
     image_file = "lena_color.tiff"
     K = 100 
     m = 10  
-    labels, centers = SLIC(image_file, K, m)
+    labels, boundary_mask = SLIC(image_file, K, m)
+
+    mask_inv = cv.bitwise_not(boundary_mask)
+    image_with_boundaries = cv.bitwise_and(cv.imread(image_file), cv.imread(image_file), mask=mask_inv)
+    cv.imshow("SLIC Superpixels with Boundaries", image_with_boundaries)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
