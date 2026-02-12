@@ -31,7 +31,7 @@ def SLIC(image_file, K, m):
         a[mask] = centers[label][1]
         b[mask] = centers[label][2]
 
-    new_rgb_image = cv.cvtColor(np.dstack((L * 100.0 / 255.0, a + 128, b + 128)).astype(np.uint8), cv.COLOR_LAB2BGR)
+    new_rgb_image = cv.cvtColor(np.dstack((L * 255.0 / 100.0, a + 128, b + 128)).astype(np.uint8), cv.COLOR_LAB2BGR)
     cv.imshow("SLIC Superpixels", new_rgb_image)
     cv.waitKey(0)
     cv.destroyAllWindows()
@@ -42,7 +42,7 @@ def SLIC(image_file, K, m):
 def distance(coord_1, coord_2, L1, a1, b1, L2, a2, b2, S, m):
     d_xy = np.sqrt((coord_1[0] - coord_2[0])**2 + (coord_1[1] - coord_2[1])**2)
     d_lab = np.sqrt((L1 - L2)**2 + (a1 - a2)**2 + (b1 - b2)**2)
-    return d_lab + (m * d_xy / S)
+    return np.sqrt(d_lab**2 + (m * d_xy / S)**2)
 
 def assign_to_clusters(L, a, b, centers, S, m):
     h, w = L.shape
