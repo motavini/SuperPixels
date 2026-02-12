@@ -18,14 +18,25 @@ def SLIC(image_file, K, m):
 
     centers = init_cluster_centers(L, a, b, S)
     # Number of recommended iterations is 10
-    for _ in range(2):
+    for _ in range(10):
         labels = assign_to_clusters(L, a, b, centers, S, m)
         centers = update_cluster_centers(L, a, b, labels, centers)
 
     labels = assign_to_clusters(L, a, b, centers, S, m)
     labels = enforce_connectivity(labels)
 
-    print(labels[:3*S, :3*S])  # Debug
+    for label in np.unique(labels):
+        mask = (labels == label)
+        L[mask] = centers[label][0]
+        a[mask] = centers[label][1]
+        b[mask] = centers[label][2]
+
+    new_rgb_image = cv.cvtColor(np.dstack((L * 100.0 / 255.0, a + 128, b + 128)).astype(np.uint8), cv.COLOR_LAB2BGR)
+    cv.imshow("SLIC Superpixels", new_rgb_image)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+
+    return labels, centers
 
 
 def distance(coord_1, coord_2, L1, a1, b1, L2, a2, b2, S, m):
@@ -140,4 +151,4 @@ if __name__ == "__main__":
     image_file = "lena_color.tiff"
     K = 100 
     m = 10  
-    SLIC(image_file, K, m)
+    labels, centers = SLIC(image_file, K, m)
