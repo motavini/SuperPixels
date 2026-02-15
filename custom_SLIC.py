@@ -48,16 +48,36 @@ def assign_to_clusters(L, a, b, centers, S, m):
     distances = np.full((h, w), np.inf)
     labels = np.full((h, w), -1, dtype=np.int32)
 
-    for idx, (_, _, _, i, j) in enumerate(centers):
-        for di in range(-S, S + 1):
-            for dj in range(-S, S + 1):
-                ni, nj = i + di, j + dj
-                if 0 <= ni < h and 0 <= nj < w:
-                    d = distance((i, j), (ni, nj), L[ni, nj], a[ni, nj], b[ni, nj], centers[idx][0], centers[idx][1], centers[idx][2], S, m)
-                    if d < distances[ni, nj]:
-                        distances[ni, nj] = d
-                        labels[ni, nj] = idx
-    
+    y_coords, x_coords = np.mgrid[0:h, 0:w]
+
+    for idx, (cL, ca, cb, ci, cj) in enumerate(centers):
+        min_y = max(0, ci - S)
+        max_y = min(h, ci + S + 1)
+        min_x = max(0, cj - S)
+        max_x = min(w, cj + S + 1)
+
+        L_slice = L[min_y:max_y, min_x:max_x]
+        a_slice = a[min_y:max_y, min_x:max_x]
+        b_slice = b[min_y:max_y, min_x:max_x]
+        
+        y_slice = y_coords[min_y:max_y, min_x:max_x]
+        x_slice = x_coords[min_y:max_y, min_x:max_x]
+
+        dc_sq = (L_slice - cL)**2 + (a_slice - ca)**2 + (b_slice - cb)**2
+        
+        ds_sq = (y_slice - ci)**2 + (x_slice - cj)**2
+        
+        D = np.sqrt(dc_sq + ((m / S)**2) * ds_sq)
+
+        current_dists = distances[min_y:max_y, min_x:max_x]
+        mask = D < current_dists
+
+        distances[min_y:max_y, min_x:max_x][mask] = D[mask]
+        
+        labels_slice = labels[min_y:max_y, min_x:max_x]
+        labels_slice[mask] = idx
+        labels[min_y:max_y, min_x:max_x] = labels_slice
+
     return labels
 
 def update_cluster_centers(L, a, b, labels, centers):
